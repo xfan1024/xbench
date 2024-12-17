@@ -2,11 +2,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <time.h>
+#include <string.h>
 #include <math.h>
-#include <pthread.h>
-#include <unistd.h>
 #include <getopt.h>
+#include "multitask.h"
 
 #ifndef TEST_DURATION
 #define TEST_DURATION 10
@@ -62,7 +61,7 @@ static void parse_args(int argc, char *argv[])
 }
 
 
-static bool is_prime(uint32_t n)
+static bool prime_check(uint32_t n)
 {
     if (n < 2)
     {
@@ -84,7 +83,7 @@ static size_t prime_count(uint32_t max)
     size_t count = 0;
     for (uint32_t i = 1; i <= max; i++)
     {
-        if (is_prime(i))
+        if (prime_check(i))
         {
             count++;
         }
@@ -92,131 +91,39 @@ static size_t prime_count(uint32_t max)
     return count;
 }
 
-static void prime_task()
+static void prime_task(struct mt_data *data)
 {
     if (prime_count(100000) != 9592)
     {
         fprintf(stderr, "prime_count(100000) != 9592\n");
         abort();
     }
-}
-
-struct work_thread_data_shared
-{
-    volatile unsigned int stop_flag;        // when set, worker thread should stop
-    pthread_mutex_t mutex;                  // protect worker_count and cond_m2w, cond_w2m
-    unsigned int worker_count;
-    unsigned int start_fence;
-    pthread_cond_t cond_m2w;                // main thread to worker thread
-    pthread_cond_t cond_w2m;                // worker thread to main thread
-};
-
-struct thread_data
-{
-    unsigned int index;
-    pthread_t thread;
-    struct work_thread_data_shared *shared;
-    size_t prime_task_count;                // result of worker thread
-};
-
-static void *prime_thread_entry(void *arg)
-{
-    struct thread_data *data = (struct thread_data *)arg;
-    struct work_thread_data_shared *shared = data->shared;
-
-    // warmup
-    prime_task();
-    pthread_mutex_lock(&shared->mutex);
-    shared->worker_count += 1;
-    pthread_cond_signal(&shared->cond_w2m);
-    pthread_mutex_unlock(&shared->mutex);
-
-    // wait for start
-    pthread_mutex_lock(&shared->mutex);
-    while (!shared->start_fence)
-    {
-        pthread_cond_wait(&shared->cond_m2w, &shared->mutex);
-    }
-    pthread_mutex_unlock(&shared->mutex);
-
-    // run test until stop_flag is set
-    while (!shared->stop_flag)
-    {
-        prime_task();
-        data->prime_task_count++;
-    }
-
-    pthread_mutex_lock(&shared->mutex);
-    shared->worker_count -= 1;
-    pthread_cond_signal(&shared->cond_w2m);
-    pthread_mutex_unlock(&shared->mutex);
-    return NULL;
+    mt_counter_inc(data);
 }
 
 static double do_prime_test()
 {
-    struct work_thread_data_shared shared =
-    {
-        .mutex = PTHREAD_MUTEX_INITIALIZER,
-        .cond_m2w = PTHREAD_COND_INITIALIZER,
-        .cond_w2m = PTHREAD_COND_INITIALIZER,
-    };
-    struct thread_data *threads_data = (struct thread_data *)malloc(sizeof(struct thread_data) * test_threads);
-    size_t total_tasks = 0;
-    struct timespec start_time, end_time;
+    struct mt_shared shared;
+    double r;
+
+    mt_shared_init(&shared);
+    shared.task_test = prime_task;
+    shared.task_warmup = prime_task;
+
+    struct mt_data *data_list = (struct mt_data *)malloc(sizeof(struct mt_data) * test_threads);
+    memset(data_list, 0, sizeof(struct mt_data) * test_threads);
 
     for (size_t i = 0; i < test_threads; i++)
     {
-        threads_data[i].index = (unsigned int)i;
-        threads_data[i].shared = &shared;
-        threads_data[i].prime_task_count = 0;
-        pthread_create(&threads_data[i].thread, NULL, prime_thread_entry, &threads_data[i]);
+        data_list[i].shared = &shared;
     }
 
-    // wait worker_count becomes test_threads
-    pthread_mutex_lock(&shared.mutex);
-    while (shared.worker_count != test_threads)
-    {
-        pthread_cond_wait(&shared.cond_w2m, &shared.mutex);
-    }
-    pthread_mutex_unlock(&shared.mutex);
+    r = mt_run_all(data_list, test_threads, test_duration);
 
-    // record start time
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
+    mt_shared_destroy(&shared);
+    free(data_list);
 
-    // notify all worker threads to start
-    pthread_mutex_lock(&shared.mutex);
-    shared.start_fence = 1;
-    pthread_cond_broadcast(&shared.cond_m2w);
-    pthread_mutex_unlock(&shared.mutex);
-
-    // run test for test_duration seconds
-    sleep(test_duration);
-
-    // notify all worker threads to stop
-    shared.stop_flag = 1;
-
-    // wait worker_count becomes 0
-    pthread_mutex_lock(&shared.mutex);
-    while (shared.worker_count != 0)
-    {
-        pthread_cond_wait(&shared.cond_w2m, &shared.mutex);
-    }
-    pthread_mutex_unlock(&shared.mutex);
-
-    // record end time
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-
-    // release threads_data
-    for (size_t i = 0; i < test_threads; i++)
-    {
-        pthread_join(threads_data[i].thread, NULL);
-        total_tasks += threads_data[i].prime_task_count;
-    }
-    free(threads_data);
-
-    uint64_t elapsed_time = (end_time.tv_sec - start_time.tv_sec) * 1000000000 + (end_time.tv_nsec - start_time.tv_nsec);
-    return (double)total_tasks / (elapsed_time / 1000000000.0);
+    return r;
 }
 
 int main(int argc, char *argv[])

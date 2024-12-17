@@ -3,7 +3,6 @@ project(xbench-bin)
 
 # release compile
 set(CMAKE_BUILD_TYPE Release)
-# add global compile flags
 add_compile_options(-Wall -Wextra -Werror)
 add_compile_options(-fno-tree-loop-distribute-patterns)
 
@@ -20,7 +19,6 @@ if (NUMA_FOUND)
     target_compile_options(multitask PUBLIC -D HAVE_NUMA)
 endif()
 
-
 add_executable(xb-memtest xb-memtest.c)
 target_link_libraries(xb-memtest PRIVATE Threads::Threads)
 if (NUMA_FOUND)
@@ -29,7 +27,7 @@ if (NUMA_FOUND)
 endif()
 
 add_executable(xb-prime xb-prime.c)
-target_link_libraries(xb-prime PRIVATE Threads::Threads m)
+target_link_libraries(xb-prime PRIVATE multitask m)
 
 add_executable(xb-openssl xb-openssl.c )
 target_link_libraries(xb-openssl PRIVATE multitask OpenSSL::Crypto)
