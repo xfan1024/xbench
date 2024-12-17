@@ -11,7 +11,7 @@
 #include <numa.h>
 #endif
 
-void *memtest_alloc(size_t size)
+static void *memtest_alloc(size_t size)
 {
 #ifdef HAVE_NUMA
     if (numa_available() >= 0)
@@ -22,7 +22,7 @@ void *memtest_alloc(size_t size)
     return malloc(size);
 }
 
-void memtest_free(void *ptr, size_t size)
+static void memtest_free(void *ptr, size_t size)
 {
 #ifdef HAVE_NUMA
     if (numa_available() >= 0)
@@ -66,7 +66,7 @@ struct test_result
     double worst_rate;
 };
 
-void test_copy(void *memory, size_t size)
+static void test_copy(void *memory, size_t size)
 {
     size_t count = size / sizeof(uint64_t);
     size_t half = count / 2;
@@ -79,7 +79,7 @@ void test_copy(void *memory, size_t size)
     }
 }
 
-void test_load(void *memory, size_t size)
+static void test_load(void *memory, size_t size)
 {
     size_t count = size / sizeof(uint64_t);
     uint64_t *load_ptr = (uint64_t *)memory;
@@ -95,7 +95,7 @@ void test_load(void *memory, size_t size)
 
 }
 
-void test_store(void *memory, size_t size)
+static void test_store(void *memory, size_t size)
 {
     size_t count = size / sizeof(uint64_t);
     uint64_t *store_ptr = (uint64_t *)memory;
@@ -106,12 +106,12 @@ void test_store(void *memory, size_t size)
     }
 }
 
-void test_memset(void *memory, size_t size)
+static void test_memset(void *memory, size_t size)
 {
     memset(memory, 0, size);
 }
 
-void test_memcpy(void *memory, size_t size)
+static void test_memcpy(void *memory, size_t size)
 {
     size_t count = size / sizeof(uint64_t);
     size_t half = count / 2;
@@ -121,12 +121,12 @@ void test_memcpy(void *memory, size_t size)
     memcpy(store_ptr, load_ptr, half * sizeof(uint64_t));
 }
 
-double to_megabytes_per_second(size_t size, uint64_t duration)
+static double to_megabytes_per_second(size_t size, uint64_t duration)
 {
     return (double)size / duration * 1000000000 / 1024 / 1024;
 }
 
-void memtest_init(void *memory, size_t size)
+static void memtest_init(void *memory, size_t size)
 {
     size_t count = size / sizeof(uint64_t);
     uint64_t *ptr = (uint64_t *)memory;
@@ -136,15 +136,15 @@ void memtest_init(void *memory, size_t size)
     }
 }
 
-unsigned int test_quiet;
-unsigned int test_gb;
-unsigned int test_duration;
-unsigned int test_threads;
+static unsigned int test_quiet;
+static unsigned int test_gb;
+static unsigned int test_duration;
+static unsigned int test_threads;
 
-size_t test_case_count;
-char **test_case_list;
+static size_t test_case_count;
+static char **test_case_list;
 
-void usage(FILE *f)
+static void usage(FILE *f)
 {
     fprintf(f, "Usage: memtest [Options] [Cases...]\n"
                 "Options:\n"
@@ -161,7 +161,7 @@ void usage(FILE *f)
                 "  MEMCPY        test libc memcpy performance\n");
 }
 
-void parse_args(int argc, char *argv[])
+static void parse_args(int argc, char *argv[])
 {
     int opt;
     while ((opt = getopt(argc, argv, "hqG:t:T:")) != -1)
@@ -224,7 +224,7 @@ struct thread_data
     size_t worker_access_bytes;             // result of worker thread
 };
 
-void *memtest_thread_entry(void *arg)
+static void *memtest_thread_entry(void *arg)
 {
     struct thread_data *data = (struct thread_data *)arg;
     struct work_thread_data_shared *shared = data->shared;
@@ -278,7 +278,7 @@ out:
     return NULL;
 }
 
-double do_memory_test(size_t mem_size, void (*memtest_func)(void *, size_t))
+static double do_memory_test(size_t mem_size, void (*memtest_func)(void *, size_t))
 {
     struct work_thread_data_shared shared =
     {
@@ -348,7 +348,7 @@ double do_memory_test(size_t mem_size, void (*memtest_func)(void *, size_t))
     return to_megabytes_per_second(total_bytes, elapsed_time);
 }
 
-struct test_function test_functions[] = {
+static struct test_function test_functions[] = {
     {"COPY", test_copy},
     {"STORE", test_store},
     {"LOAD", test_load},
@@ -368,7 +368,7 @@ int main(int argc, char *argv[])
     if (!test_quiet)
     {
         printf("MAGIC_NOT_ZERO=%d test_gb=%u\n", MAGIC_NOT_ZERO, test_gb);
-        printf("TEST                Rate\n");
+        printf("TEST                Rate(MB/s)\n");
     }
     if (test_case_count > 0)
     {

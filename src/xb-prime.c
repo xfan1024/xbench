@@ -12,11 +12,11 @@
 #define TEST_DURATION 10
 #endif
 
-unsigned int test_quiet;
-unsigned int test_duration;
-unsigned int test_threads;
+static unsigned int test_quiet;
+static unsigned int test_duration;
+static unsigned int test_threads;
 
-void usage(FILE *f)
+static void usage(FILE *f)
 {
     fprintf(f, "Usage: memtest [Options]\n"
                 "Options:\n"
@@ -26,7 +26,7 @@ void usage(FILE *f)
                 "  -T <threads>  Specify the number of threads to test\n");
 }
 
-void parse_args(int argc, char *argv[])
+static void parse_args(int argc, char *argv[])
 {
     int opt;
     while ((opt = getopt(argc, argv, "hqt:T:")) != -1)
@@ -62,7 +62,7 @@ void parse_args(int argc, char *argv[])
 }
 
 
-bool is_prime(uint32_t n)
+static bool is_prime(uint32_t n)
 {
     if (n < 2)
     {
@@ -79,7 +79,7 @@ bool is_prime(uint32_t n)
     return true;
 }
 
-size_t prime_count(uint32_t max)
+static size_t prime_count(uint32_t max)
 {
     size_t count = 0;
     for (uint32_t i = 1; i <= max; i++)
@@ -92,7 +92,7 @@ size_t prime_count(uint32_t max)
     return count;
 }
 
-void prime_task()
+static void prime_task()
 {
     if (prime_count(100000) != 9592)
     {
@@ -119,7 +119,7 @@ struct thread_data
     size_t prime_task_count;                // result of worker thread
 };
 
-void *prime_thread_entry(void *arg)
+static void *prime_thread_entry(void *arg)
 {
     struct thread_data *data = (struct thread_data *)arg;
     struct work_thread_data_shared *shared = data->shared;
@@ -153,7 +153,7 @@ void *prime_thread_entry(void *arg)
     return NULL;
 }
 
-double do_prime_test()
+static double do_prime_test()
 {
     struct work_thread_data_shared shared =
     {
@@ -229,7 +229,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        printf("prime_count(100000) run %.1f times/sec\n", tasks_per_second);
+        printf("prime_count(100000) run %.1f ops/s\n", tasks_per_second);
     }
     return 0;
 }
