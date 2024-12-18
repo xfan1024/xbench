@@ -23,17 +23,18 @@ static void *mt_worker_entry(void *arg)
 {
     struct mt_data *data = (struct mt_data *)arg;
     struct mt_shared *shared = data->shared;
+    const struct mt_test_ops *ops = shared->ops;
 
     // prepare
-    if (shared->task_prepare)
+    if (ops->prepare)
     {
-        shared->task_prepare(data);
+        ops->prepare(data);
     }
 
     // warmup
-    if (shared->task_warmup)
+    if (ops->warmup)
     {
-        shared->task_warmup(data);
+        ops->warmup(data);
     }
 
     // notify main thread that worker thread is ready
@@ -56,7 +57,7 @@ static void *mt_worker_entry(void *arg)
     // run test until stop_flag is set
     while (!shared->stop_flag)
     {
-        shared->task_test(data);
+        ops->test(data);
     }
 
     // notify main thread that worker thread is stopped
@@ -68,9 +69,9 @@ static void *mt_worker_entry(void *arg)
     }
     pthread_mutex_unlock(&shared->mutex);
 
-    if (shared->task_clean)
+    if (ops->clean)
     {
-        shared->task_clean(data);
+        ops->clean(data);
     }
     return NULL;
 
@@ -95,9 +96,14 @@ double mt_run_all(struct mt_data *data_list, unsigned int tasks, unsigned int du
         if (i == 0)
         {
             shared = data->shared;
-            if (shared->task_test == NULL)
+            if (shared->ops == NULL)
             {
-                fprintf(stderr, "task_test is not set\n");
+                fprintf(stderr, "shared->ops is not set\n");
+                abort();
+            }
+            if (shared->ops->test == NULL)
+            {
+                fprintf(stderr, "shared->ops->test is not set\n");
                 abort();
             }
             shared->workers = tasks;
@@ -156,6 +162,40 @@ double mt_run_all(struct mt_data *data_list, unsigned int tasks, unsigned int du
     elapsed = (end_time.tv_sec - start_time.tv_sec) * 1000000000 + (end_time.tv_nsec - start_time.tv_nsec);
     return (double) counter / (elapsed / 1000000000.0);
 }
+
+double mt_run_all_simple(const struct mt_test_ops *ops, unsigned int tasks, unsigned int duration, const uintptr_t *userdata, uintptr_t userdata_count)
+{
+    struct mt_shared shared;
+    double r;
+
+    mt_shared_init(&shared);
+    if (userdata && userdata_count)
+    {
+        if (userdata_count > sizeof(shared.userdata) / sizeof(shared.userdata[0]))
+        {
+            fprintf(stderr, "userdata_count is too large\n");
+            abort();
+        }
+        memcpy(shared.userdata, userdata, sizeof(uintptr_t) * userdata_count);
+    }
+
+    shared.ops = ops;
+
+    struct mt_data *data_list = (struct mt_data *)malloc(sizeof(struct mt_data) * tasks);
+    memset(data_list, 0, sizeof(struct mt_data) * tasks);
+
+    for (size_t i = 0; i < tasks; i++)
+    {
+        data_list[i].shared = &shared;
+    }
+
+    r = mt_run_all(data_list, tasks, duration);
+
+    mt_shared_destroy(&shared);
+    free(data_list);
+    return r;
+}
+
 
 #ifdef HAVE_NUMA
 #include <numa.h>

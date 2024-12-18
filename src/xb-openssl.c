@@ -121,8 +121,15 @@ static void ssl_md_test(struct mt_data *data)
     mt_counter_inc(data);
 }
 
+
 static double do_ssl_md_test(const char *md_name, size_t block_size)
 {
+    static struct mt_test_ops ssl_md_ops = {
+        .prepare = ssl_md_parpare,
+        .clean = ssl_md_clean,
+        .warmup = ssl_md_test,
+        .test = ssl_md_test,
+    };
     const EVP_MD *md = EVP_get_digestbyname(md_name);
     if (md == NULL)
     {
@@ -132,10 +139,7 @@ static double do_ssl_md_test(const char *md_name, size_t block_size)
 
     struct mt_shared shared;
     mt_shared_init(&shared);
-    shared.task_prepare = ssl_md_parpare;
-    shared.task_clean = ssl_md_clean;
-    shared.task_warmup = ssl_md_test;
-    shared.task_test = ssl_md_test;
+    shared.ops = &ssl_md_ops;
     shared.userdata[0] = (uintptr_t)md;
     shared.userdata[1] = (uintptr_t)block_size;
 
@@ -160,13 +164,12 @@ struct test_function
 };
 
 static struct test_function test_functions[] = {
-    {"md5-8k",      "md5",      8192},
-    {"sm3-8k",      "sm3",      8192},
-    {"sha1-8k",     "sha1",     8192},
-    {"sha256-8k",   "sha256",   8192},
-    {"sha512-8k",   "sha512",   8192},
+    {"SHA1-8K",     "sha1",     8192},
+    {"SHA256-8K",   "sha256",   8192},
+    {"SHA512-8K",   "sha512",   8192},
+    {"MD5-8K",      "md5",      8192},
+    {"SM3-8K",      "sm3",      8192},
 };
-
 
 int main(int argc, char *argv[])
 {

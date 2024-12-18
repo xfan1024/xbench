@@ -26,8 +26,8 @@ if (NUMA_FOUND)
     target_compile_options(xb-memtest PRIVATE -D HAVE_NUMA)
 endif()
 
-add_executable(xb-prime xb-prime.c)
-target_link_libraries(xb-prime PRIVATE multitask m)
+add_executable(xb-cputest xb-cputest.c cputest-algorithm.c cputest-mat.c)
+target_link_libraries(xb-cputest PRIVATE multitask m)
 
 add_executable(xb-openssl xb-openssl.c )
 target_link_libraries(xb-openssl PRIVATE multitask OpenSSL::Crypto)
