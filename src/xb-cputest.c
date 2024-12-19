@@ -146,7 +146,7 @@ static struct mt_test_ops circle_ops = {
     .test = circle_task,
 };
 
-#define SORTI32_ELEMENTS (14 * 1024)
+#define SORTI32_ELEMENTS (12500)
 
 static int32_t sorti32_generate(uint64_t *state)
 {
@@ -197,7 +197,7 @@ static struct mt_test_ops sort_i32_ops = {
     .test = sorti32_task,
 };
 
-#define SORTU64_ELEMENTS (14 * 1024)
+#define SORTU64_ELEMENTS (12500)
 static uint64_t sortu64_generate(uint64_t *state)
 {
     *state = xorshift_next(*state);
